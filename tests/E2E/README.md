@@ -135,6 +135,16 @@ built-in certificate roots alone do not supply that bundle to the tunnel client.
 
 ## Opt-in CI
 
+For HTTP-only tunnel diagnosis, dispatch the workflow with `diagnose_tunnel=true`
+and `run_cloud=false`. This separate job installs the same pinned CLI and starts
+a disposable loopback HTTP page with a unique response. It checks direct access,
+tunnel registration, proxy DNS, TCP 443/proxy-port connectivity and HTTP response
+identity through the proxy for both loopback aliases. It builds no Medusa image,
+uses no suite/token or generated login, calls no suite API and starts no browser
+execution. Its isolated tunnel is stopped after probing. A failed HTTP probe fails
+the job and still uploads `tunnel-diagnostic.json`; it does not set the repository
+verification variable automatically. Do not select both dispatch options together.
+
 `.github/workflows/e2e-tests.yml` provides manual dispatch only, with `run_cloud`
 defaulting to false. It has no push, PR or schedule trigger and is advisory: it
 should not be added to branch protection. Missing configuration skips the E2E
@@ -175,8 +185,10 @@ before dispatching again. Runner build capacity and these limits remain unverifi
 CLI, syntax and build output stay in ignored `.runtime/ci-raw/`. The evidence step
 redacts fixture environment values and the CI token, including XML/URL/JSON
 representations, before uploading JUnit, logs and provenance from `.run/`. If
-collection fails, upload is skipped. Artifact names include run ID and attempt;
-retention is seven days. Source/harness commits, file hashes and image metadata
+collection fails, upload is skipped. Artifact names include run ID and attempt.
+The upload explicitly includes hidden files only within that sanitized directory;
+raw `.runtime/` files are never included.
+Retention is seven days. Source/harness commits, file hashes and image metadata
 identify the tested inputs. Failures retain their job status even when evidence
 collection succeeds. Cleanup always attempts to remove this ephemeral Compose
 fixture and its volume; no shared VM is changed.
