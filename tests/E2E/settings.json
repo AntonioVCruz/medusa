@@ -1,0 +1,6 @@
+{
+  "useParallelCombinator": false,
+  "maximumParallelServers": 2,
+  "maxParallelBatchSize": 1,
+  "maximumNumerOfRetries": 0
+}
