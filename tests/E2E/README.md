@@ -1,12 +1,14 @@
-# Medusa Admin browser smoke
+# Medusa Admin browser E2E
 
 This work continues the admin-login case in
 [amandassa-tR/medusa](https://github.com/amandassa-tR/medusa/tree/bd9605e1115396f7a0c0d0081e9d58fbae7a1fda/testRigor).
-It adds an assertion for the empty product list after authentication. The fixture
+It covers authentication, category persistence and commerce workflows in the
+admin, including variant pricing, reservations, draft edits, customer groups,
+scoped promotions and partial fulfillment. The fixture
 builds this repository's workspace packages and runs a separate application using
 those packages. It does not install a released Medusa backend.
 
-The three cases passed strict testRigor syntax validation and five consecutive
+The original three cases passed strict testRigor syntax validation and five consecutive
 full-suite CLI runs against source `01de0be27a` through a dedicated VM HTTPS
 endpoint. The earlier localhost tunnel failed before Medusa rendered. Tunnel
 connectivity and hosted CI remain unverified. This directory is a development draft.
@@ -44,6 +46,44 @@ source-built VM image, with sequential execution, whole-test retries disabled
 and no categories left behind. This verifies only these admin journeys on that
 pinned environment; hosted CI and the localhost tunnel remain unverified.
 
+The added cases exercise commerce behavior:
+
+| Case | Business checks |
+| --- | --- |
+| TC-04 | Generate four size/color variants, reject a duplicate SKU, correct it and verify persisted SKU/price mappings. |
+| TC-05 | Reject a reservation above stock, create/edit it and restore available inventory after deletion. |
+| TC-06 | Cancel a quantity edit without changing the draft total, then save it and verify EUR 50 becomes EUR 75. |
+| TC-07 | Add and remove group membership in both views while preserving the customer. |
+| TC-08 | Apply a 10% promotion only to eligible products, verify EUR 60 becomes EUR 55, then remove it and restore EUR 60. |
+| TC-09 | Fulfill and ship two of three units; verify the remaining unfulfilled unit and stock/reservation arithmetic. |
+
+TC-04 through TC-07 passed three consecutive combined saved-suite browser runs
+against the isolated source-built VM on 2026-11-18 UTC. Definitions, fixture,
+settings and VM image stayed unchanged, with sequential execution, whole-test
+retries disabled and zero step errors or warnings. Independent API postchecks
+and owned-record cleanup passed after every run. This verifies these four
+journeys on that pinned environment. The historical five-run result above
+covers only TC-01 through TC-03; hosted CI remains unverified.
+
+TC-08 and TC-09 passed three consecutive combined saved-suite browser runs on
+2026-11-18 UTC against the same VM image. Their case definitions, fixture rules,
+infrastructure, variables and settings stayed unchanged; all six executions had
+zero step errors or warnings. Independent API checks and cleanup passed after
+each run. The API checks confirmed ordered 3 / fulfilled 2 / shipped 2, one
+shipped fulfillment and no new products remaining.
+
+A subsequent [full-nine regression](https://app.testrigor.com/test-suites/KuSw8XGMpEdAPFwh8/runs/vcPhagr8BLSzqxGNS)
+passed all nine saved cases with zero step errors or warnings. Both fixture
+postchecks and cleanup routines passed. This is one combined regression on the
+exposed VM; hosted nine-case CI and native localhost tunnel access remain unverified.
+
+Their reusable API rules create and clean
+their own products, customers and orders during execution, preserving TC-01's
+empty-catalog expectation. API setup supplies data; the promotion creation,
+application/removal and fulfillment/shipping transitions are UI operations.
+The shared manual-shipping infrastructure uses an owned warehouse, DE service
+zone and zero-cost shipping option. No external carrier or payment is used.
+
 ## Local fixture
 
 Requirements: Docker with Compose v2, Git, Bash, OpenSSL and Node.js. The container
@@ -65,14 +105,18 @@ For a machine with limited CPU capacity, use
 four source-build tasks. The two default plugins build sequentially against the
 already compiled workspace packages.
 
-The admin is at `http://127.0.0.1:19000/app`. Only loopback is published. PostgreSQL
-has its own Compose volume and no host port. The project name is
+The admin is at `http://127.0.0.1:19000/app`. Only loopback is published.
+The Compose app maps container port `9000` to host `127.0.0.1:19000`; `/app` is
+the fixture's default Admin path. Startup readiness curls bypass proxies and
+have per-request connection and total timeouts.
+PostgreSQL has its own Compose volume and no host port. The project name is
 `medusa-testrigor-e2e`; existing project containers are untouched. No storefront,
 payment provider or external email service is provisioned.
 
 Generated fixture credentials stay in `.runtime/environment.env` and survive
-repeat installation. `.runtime/variables.json` supplies only the fixture login
-to testRigor. Both files are ignored. Do not publish them or include them in logs.
+repeat installation. `.runtime/variables.json` supplies the fixture login and
+public commerce names to testRigor. Both files are ignored. Do not publish them
+or include them in logs.
 The app uses JWT authentication because the local HTTP fixture does not support
 production Secure session cookies.
 
@@ -103,6 +147,9 @@ it or passing it in command arguments.
 After approval, run from the repository root with a unique report directory:
 
 ```bash
+node tests/E2E/prepare-commerce-fixture.mjs prepare
+node tests/E2E/prepare-order-infrastructure.mjs prepare
+node tests/E2E/prepare-variables.mjs
 testrigor test-suite run "$TESTRIGOR_SUITE_ID" \
   --url "$MEDUSA_E2E_URL" \
   --test-cases-path 'tests/E2E/test-cases/**/*.yaml' \
@@ -112,12 +159,45 @@ testrigor test-suite run "$TESTRIGOR_SUITE_ID" \
   --labels medusa-admin-e2e \
   --branch "$HARNESS_BRANCH" --commit "$HARNESS_COMMIT" \
   --junit-report-save-path "$UNIQUE_REPORT_DIR/junit.xml"
+node tests/E2E/prepare-commerce-fixture.mjs check
+node tests/E2E/prepare-order-infrastructure.mjs check
+node tests/E2E/prepare-order-infrastructure.mjs cleanup
+node tests/E2E/prepare-commerce-fixture.mjs cleanup
 ```
+
+Always run `cleanup` after a failed execution as well. API setup supplies an
+owned stock location, a tax-free EUR region, stock of ten, independent customers
+and a EUR 50 draft. Tests perform the business transitions through the UI. The
+API postcheck verifies restored stock, the persisted EUR 75 draft and removal of
+the relationship without customer deletion. Cleanup deletes recorded business
+IDs and recovers products bearing this run's generated prefix, while retaining
+the owned region and location. It never resets the database. Private state lives
+in `.runtime/commerce-fixture.json`; preserve it until cleanup finishes.
+
+Prepare a fresh fixture before every run, including runs started from the
+testRigor UI. The saved cases use these prepared records; the UI run button does
+not provision them. Run cleanup before preparing the next fixture, since TC-06
+intentionally finishes with a saved EUR 75 draft.
+
+The order-infrastructure preparation records the run boundary and publishes
+non-secret IDs through `.runtime/order-infrastructure.json`. The cases use these
+IDs and the protected administrator variables for their API setup. Cleanup must
+use the same target and state file. It releases remaining test reservations and
+removes test-owned products, customers and inventory items. Medusa retains order
+history, and shipped fulfillments cannot be canceled: those test orders remain
+identified by `e2e_owner`, `e2e_case`, `e2e_run` and `e2e_retired` metadata. Failed
+unshipped test orders are canceled. The owned shipping infrastructure remains
+available for subsequent runs; the ephemeral CI database is removed at job end.
+
+For a remote target set `MEDUSA_E2E_URL` before preparation and supply that
+instance's `E2E_ADMIN_EMAIL` and `E2E_ADMIN_PASSWORD` through the environment.
+Use the same target and fixture state for prepare, check and cleanup. A partial
+setup must be cleaned before preparing another run.
 
 The report directory must already exist. No run uses `--explicit-mutations`;
 remote suite replacement is outside this draft's scope. Do not run against the
 senior's reference suite or overlap executions on one suite. A reliable result
-requires five consecutive clean runs with unchanged source, harness, cases,
+requires the agreed consecutive clean runs with unchanged source, harness, cases,
 rules, settings and environment. Any failure or change restarts the count.
 
 Set `MEDUSA_E2E_URL` to the approved isolated admin endpoint including `/app`.
@@ -166,12 +246,30 @@ Before enabling cloud execution, the repository owner must:
    consumes a cloud execution. Repository configuration and hosted execution need
    separate approval. No fork PR code is executed with secrets by this workflow.
 
-The job uses Ubuntu 24.04, Node 22.22.0, exact CLI version 2.0.9 and SHA-pinned
+The job uses Ubuntu 24.04, Node 22.22.0, exact CLI version 2.0.11 and SHA-pinned
 actions. It builds the checked-out source with the existing pinned Docker fixture;
-it does not test the previously deployed VM instead. An authenticated API probe
+it does not test the previously deployed VM instead. After startup,
+`python3 tests/E2E/ci-support.py admin-probe` resolves the published loopback
+mapping with `docker compose port app 9000` and checks its `/app` URL using
+`curl --noproxy '*' --connect-timeout 5 --max-time 20`. It logs the URL, status,
+redirect location and content type in the job and sanitized `admin-http.log`.
+The fixture must return HTTP 200 without a redirect, with HTML identical to its
+built `public/admin/index.html` and the Medusa mount element. A failure stops
+execution before testRigor; the always-running evidence collector captures the
+build and startup logs. The successful check exports `MEDUSA_E2E_URL` for the
+fixture helpers and CLI, currently `http://127.0.0.1:19000/app`.
+
+An authenticated API probe
 checks the image's source marker and empty products/categories before execution.
-After a successful CLI exit it requires three JUnit cases with no failures,
-errors or skips, and rechecks the empty catalog. The existing run settings keep
+Before execution it prepares the commerce fixtures and manual-shipping infrastructure.
+The CLI prints its installed version, then runs with `--localhost --verbose`
+against that checked Admin URL and manages the tunnel itself. The standalone
+`diagnose-tunnel.cjs` is used only by the separate diagnostic dispatch; a static
+page diagnostic does not establish actual Admin reachability.
+After a successful CLI exit
+it requires nine JUnit cases with no failures, errors or skips, verifies the
+commerce and partial-fulfillment outcomes and rechecks the empty catalog. It attempts business-record
+cleanup before collecting evidence, even after failures. The existing run settings keep
 cases sequential and whole-test retries disabled. Ordinary execution omits
 `--explicit-mutations` and does not replace saved suite content.
 
@@ -184,7 +282,7 @@ before dispatching again. Runner build capacity and these limits remain unverifi
 
 CLI, syntax and build output stay in ignored `.runtime/ci-raw/`. The evidence step
 redacts fixture environment values and the CI token, including XML/URL/JSON
-representations, before uploading JUnit, logs and provenance from `.run/`. If
+representations, and redacts transient API JWTs before uploading JUnit, logs and provenance from `.run/`. If
 collection fails, upload is skipped. Artifact names include run ID and attempt.
 The upload explicitly includes hidden files only within that sanitized directory;
 raw `.runtime/` files are never included.

@@ -1,0 +1,41 @@
+customSteps: |
+  medusa-admin-sign-in
+  click "Inventory"
+  click "Reservations"
+  click "Create"
+  click "Item to reserve"
+  click stored value "e2eInventory"
+  click "Location"
+  click stored value "e2eWarehouse"
+  enter "11" into "Quantity"
+  click "Create"
+  check that page contains "Minimum quantity is 1 and maximum quantity is 10"
+  enter "3" into "Quantity"
+  enter "E2E reservation lifecycle" into "Description"
+  click "Create"
+  reload
+  check that page contains "10" to the right of "In stock at this location"
+  check that page contains "7" to the right of "Available at this location"
+  check that page contains "3" to the right of "Reserved at this location"
+  click button to the right of "Reservation of"
+  click "Edit"
+  enter "5" into "Reserve amount"
+  click "Save"
+  reload
+  check that page contains "5" to the right of "Available at this location"
+  check that page contains "5" to the right of "Reserved at this location"
+  click "Reservations"
+  click last button to the right of "E2E reservation lifecycle"
+  click "Delete"
+  click "Delete"
+  reload
+  check that page doesn't contain "E2E reservation lifecycle"
+  click "Inventory"
+  click stored value "e2eInventory"
+  check that table at row stored value "e2eWarehouse" and column "In stock" contains "10"
+  check that table at row stored value "e2eWarehouse" and column "Reserved" contains "0"
+  check that table at row stored value "e2eWarehouse" and column "Available" contains "10"
+labels:
+  - medusa-admin-e2e
+  - medusa-admin-expansion
+  - medusa-admin-inventory

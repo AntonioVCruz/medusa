@@ -1,0 +1,35 @@
+customSteps: |
+  medusa-admin-sign-in
+  click "Orders"
+  click "Drafts"
+  click stored value "e2eDraftCustomer"
+  check that page contains stored value from "e2eDraftItem"
+  check that page contains "€50.00"
+  click button to the right of "Summary"
+  click "Edit items"
+  click button to the right of stored value "e2eDraftItem"
+  enter "3" into input below "Quantity"
+  click button to the right of "EUR"
+  check that page contains "75.00 EUR"
+  click "Cancel"
+  check that page doesn't contain "Edit the items in the draft order"
+  check that page contains "2x"
+  reload
+  check that page contains "€50.00"
+  check that page doesn't contain "€75.00"
+  click button to the right of "Summary"
+  click "Edit items"
+  click button to the right of stored value "e2eDraftItem"
+  enter "3" into input below "Quantity"
+  click button to the right of "EUR"
+  check that page contains "75.00 EUR"
+  click "Save"
+  check that page doesn't contain "Edit the items in the draft order"
+  check that page contains "3x"
+  reload
+  check that page contains "€75.00"
+  check that page contains "3x"
+labels:
+  - medusa-admin-e2e
+  - medusa-admin-expansion
+  - medusa-admin-draft-orders

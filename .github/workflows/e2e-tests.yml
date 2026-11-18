@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       run_cloud:
-        description: Run the three admin cases after configuring and verifying the tunnel
+        description: Run the nine admin cases after configuring and verifying the tunnel
         type: boolean
         default: false
       diagnose_tunnel:
@@ -32,7 +32,9 @@ jobs:
         with:
           node-version: "22.22.0"
       - name: Install pinned CLI
-        run: npm install --global @testrigor/testrigor-cli@2.0.9
+        run: |
+          npm install --global @testrigor/testrigor-cli@2.0.11
+          testrigor --version
       - name: Probe HTTP transport without a browser run
         env:
           TESTRIGOR_CLI_HOME: ${{ runner.temp }}/medusa-http-tunnel-probe
@@ -100,7 +102,7 @@ jobs:
           umask 077
           mkdir -p tests/E2E/.runtime/ci-raw tests/E2E/.run
           echo "TESTRIGOR_CLI_HOME=$RUNNER_TEMP/medusa-testrigor-cli" >> "$GITHUB_ENV"
-          npm install --global @testrigor/testrigor-cli@2.0.9 > tests/E2E/.runtime/ci-raw/cli-install.log 2>&1
+          npm install --global @testrigor/testrigor-cli@2.0.11 > tests/E2E/.runtime/ci-raw/cli-install.log 2>&1
           testrigor --version
 
       - name: Build and start this checkout
@@ -108,11 +110,24 @@ jobs:
         shell: bash
         run: bash tests/E2E/install-medusa.sh install > tests/E2E/.runtime/ci-raw/build.log 2>&1
 
+      - name: Check actual Admin directly on runner loopback
+        timeout-minutes: 2
+        shell: bash
+        run: python3 tests/E2E/ci-support.py admin-probe
+
       - name: Verify source, authentication and empty catalog
         shell: bash
         run: python3 tests/E2E/ci-support.py probe
 
-      - name: Validate and run the three admin cases
+      - name: Prepare test-owned commerce data
+        shell: bash
+        run: |
+          set -euo pipefail
+          node tests/E2E/prepare-commerce-fixture.mjs prepare > tests/E2E/.runtime/ci-raw/fixture.log 2>&1
+          node tests/E2E/prepare-order-infrastructure.mjs prepare >> tests/E2E/.runtime/ci-raw/fixture.log 2>&1
+          node tests/E2E/prepare-variables.mjs
+
+      - name: Validate and run the nine admin cases
         timeout-minutes: 20
         env:
           TESTRIGOR_API_KEY: ${{ secrets.TESTRIGOR_CI_TOKEN }}
@@ -124,7 +139,7 @@ jobs:
             --rules-path 'tests/E2E/rules/**/*.yaml' \
             > tests/E2E/.runtime/ci-raw/syntax.log 2>&1
           testrigor test-suite run "$TESTRIGOR_SUITE_ID" \
-            --localhost --url http://127.0.0.1:19000/app \
+            --localhost --verbose --url "$MEDUSA_E2E_URL" \
             --test-cases-path 'tests/E2E/test-cases/**/*.yaml' \
             --rules-path 'tests/E2E/rules/**/*.yaml' \
             --variables-path tests/E2E/.runtime/variables.json \
@@ -134,6 +149,20 @@ jobs:
             --junit-report-save-path tests/E2E/.runtime/ci-raw/junit.xml \
             > tests/E2E/.runtime/ci-raw/cli.log 2>&1
           python3 tests/E2E/ci-support.py result
+
+      - name: Clean up test-owned commerce data
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          cleanup_status=0
+          if [[ -f tests/E2E/.runtime/order-infrastructure.json ]]; then
+            node tests/E2E/prepare-order-infrastructure.mjs cleanup >> tests/E2E/.runtime/ci-raw/fixture.log 2>&1 || cleanup_status=1
+          fi
+          if [[ -f tests/E2E/.runtime/commerce-fixture.json ]]; then
+            node tests/E2E/prepare-commerce-fixture.mjs cleanup >> tests/E2E/.runtime/ci-raw/fixture.log 2>&1 || cleanup_status=1
+          fi
+          exit "$cleanup_status"
 
       - name: Collect and redact evidence
         if: always()

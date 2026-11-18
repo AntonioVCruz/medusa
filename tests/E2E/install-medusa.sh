@@ -39,8 +39,8 @@ prepare() {
 
 ready() {
   for ((attempt=0; attempt<90; attempt++)); do
-    if curl --fail --silent http://127.0.0.1:19000/health >/dev/null \
-      && curl --fail --silent http://127.0.0.1:19000/app | grep -qi '<html'; then
+    if curl --noproxy '*' --connect-timeout 2 --max-time 5 --fail --silent http://127.0.0.1:19000/health >/dev/null \
+      && curl --noproxy '*' --connect-timeout 2 --max-time 5 --fail --silent http://127.0.0.1:19000/app | grep -qi '<html'; then
       printf 'Backend and admin HTTP probes passed at http://127.0.0.1:19000/app\n'
       return
     fi
