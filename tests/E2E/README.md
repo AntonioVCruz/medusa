@@ -339,7 +339,8 @@ avoid starting a run while another might still be active. Do not attribute an
 initial HTTPS pass to protocol alone: it also changes hostname and port.
 
 Local proxy checks (no cloud execution): `python3 tests/E2E/test-ci-https.py`.
-They cover trusted HTML/assets/API requests, forwarded origin/body, private-file
+They cover trusted HTML/assets/API requests, forwarded origin and both fixed-length
+and chunked request bodies, private-file
 rejection, rejection of an untrusted certificate and SAN hostname verification.
 
 Upstream publication requires a linked issue assigned to the contributor, a

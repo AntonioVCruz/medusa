@@ -2,6 +2,7 @@
 
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import importlib.util
+import http.client
 import json
 from pathlib import Path
 import shutil
@@ -87,6 +88,18 @@ with tempfile.TemporaryDirectory() as temp:
                 assert seen[-1][1]["Origin"] == origin
                 assert seen[-1][1]["X-Forwarded-Proto"] == "https"
                 assert seen[-1][2] == b'{"synthetic":true}'
+                connection = http.client.HTTPSConnection(
+                    "localhost", server.server_port,
+                    context=ssl.create_default_context(cafile=str(cert)), timeout=5)
+                connection.request("POST", "/auth/user/emailpass",
+                                   body=iter([b'{"synthetic":', b'true}']),
+                                   headers={"Origin": origin, "Content-Type": "application/json"},
+                                   encode_chunked=True)
+                assert json.loads(connection.getresponse().read()) == {"ok": True}
+                connection.close()
+                assert seen[-1][2] == b'{"synthetic":true}'
+                assert seen[-1][1]["Content-Length"] == "18"
+                assert "Transfer-Encoding" not in seen[-1][1]
                 for path in ["/private/key.pem", "/.runtime/tls/key.pem"]:
                     try:
                         trusted.open(origin + path)
@@ -110,5 +123,5 @@ with tempfile.TemporaryDirectory() as temp:
     finally:
         upstream.shutdown()
         upstream.server_close()
-print("Passed: HTTPS HTML/assets/API, forwarded origin/body, private-file rejection, "
+print("Passed: HTTPS HTML/assets/API, forwarded origin/length and chunked bodies, private-file rejection, "
       "untrusted certificate rejection, and SAN hostname validation")
