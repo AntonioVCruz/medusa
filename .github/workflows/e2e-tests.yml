@@ -33,7 +33,7 @@ jobs:
           node-version: "22.22.0"
       - name: Install pinned CLI
         run: |
-          npm install --global @testrigor/testrigor-cli@2.0.11
+          npm install --global @testrigor/testrigor-cli@3.0.0
           testrigor --version
       - name: Probe HTTP transport without a browser run
         env:
@@ -102,8 +102,8 @@ jobs:
           umask 077
           mkdir -p tests/E2E/.runtime/ci-raw tests/E2E/.run
           echo "TESTRIGOR_CLI_HOME=$RUNNER_TEMP/medusa-testrigor-cli" >> "$GITHUB_ENV"
-          npm install --global @testrigor/testrigor-cli@2.0.11 > tests/E2E/.runtime/ci-raw/cli-install.log 2>&1
-          testrigor --version
+          npm install --global @testrigor/testrigor-cli@3.0.0 > tests/E2E/.runtime/ci-raw/cli-install.log 2>&1
+          testrigor --version | tee tests/E2E/.runtime/ci-raw/cli-version.txt
 
       - name: Build and start this checkout
         timeout-minutes: 60

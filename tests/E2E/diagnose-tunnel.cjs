@@ -52,7 +52,7 @@ function probe(target, expected, proxy) {
 }
 
 async function main() {
-  const report = { timestamp: new Date().toISOString(), cli_version: "2.0.9",
+  const report = { timestamp: new Date().toISOString(), cli_version: null,
     cloud_runs: 0, suite_api_calls: 0, registration_succeeded: false, results: [] }
   const sentinel = "medusa-http-probe-" + crypto.randomBytes(16).toString("hex")
   const server = http.createServer((request, response) => response.end(sentinel))
@@ -78,7 +78,8 @@ async function main() {
     report.results.push(...await Promise.all(targets.map((target) => probe(target, sentinel))))
     const requireCli = createRequire(process.env.TESTRIGOR_CLI_PACKAGE)
     const version = requireCli("./package.json").version
-    if (version !== "2.0.9") throw new Error("Unexpected CLI version")
+    report.cli_version = version
+    if (version !== "3.0.0") throw new Error("Unexpected CLI version")
     const Tunnel = requireCli("./dist/util/tunnel.js").default
     tunnel = new Tunnel()
     await Promise.race([

@@ -246,7 +246,7 @@ Before enabling cloud execution, the repository owner must:
    consumes a cloud execution. Repository configuration and hosted execution need
    separate approval. No fork PR code is executed with secrets by this workflow.
 
-The job uses Ubuntu 24.04, Node 22.22.0, exact CLI version 2.0.11 and SHA-pinned
+The job uses Ubuntu 24.04, Node 22.22.0, exact CLI version 3.0.0 and SHA-pinned
 actions. It builds the checked-out source with the existing pinned Docker fixture;
 it does not test the previously deployed VM instead. After startup,
 `python3 tests/E2E/ci-support.py admin-probe` resolves the published loopback
@@ -262,7 +262,9 @@ fixture helpers and CLI, currently `http://127.0.0.1:19000/app`.
 An authenticated API probe
 checks the image's source marker and empty products/categories before execution.
 Before execution it prepares the commerce fixtures and manual-shipping infrastructure.
-The CLI prints its installed version, then runs with `--localhost --verbose`
+The CLI prints its installed version and saves it in `cli-version.txt`; the evidence
+collector records that actual version in `provenance.json` (or null if unavailable).
+It then runs with `--localhost --verbose`
 against that checked Admin URL and manages the tunnel itself. The standalone
 `diagnose-tunnel.cjs` is used only by the separate diagnostic dispatch; a static
 page diagnostic does not establish actual Admin reachability.

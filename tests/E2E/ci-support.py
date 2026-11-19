@@ -152,12 +152,15 @@ def collect():
                          for part in p.relative_to(E2E).parts)]
     workflow = ROOT / ".github/workflows/e2e-tests.yml"
     files.append(workflow)
+    version_file = RAW / "cli-version.txt"
+    version = re.search(r"@testrigor/testrigor-cli/([^\s]+)",
+                        version_file.read_text() if version_file.exists() else "")
     provenance = {
         "application_commit": os.environ.get("HARNESS_COMMIT"),
         "harness_commit": os.environ.get("HARNESS_COMMIT"),
         "branch": os.environ.get("HARNESS_BRANCH"),
         "job_status": os.environ.get("JOB_STATUS"),
-        "cli_version": "2.0.11",
+        "cli_version": version.group(1) if version else None,
         "admin_url": os.environ.get("MEDUSA_E2E_URL"),
         "transport": "testRigor localhost tunnel (requires separate verification)",
         "sha256": {p.relative_to(ROOT).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
