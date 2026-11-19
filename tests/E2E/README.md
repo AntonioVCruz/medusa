@@ -10,8 +10,9 @@ those packages. It does not install a released Medusa backend.
 
 The original three cases passed strict testRigor syntax validation and five consecutive
 full-suite CLI runs against source `01de0be27a` through a dedicated VM HTTPS
-endpoint. The earlier localhost tunnel failed before Medusa rendered. Tunnel
-connectivity and hosted CI remain unverified. This directory is a development draft.
+endpoint. Earlier HTTP localhost tunnel attempts failed before Medusa rendered.
+On 2026-11-19, the hosted HTTPS localhost login and full nine-case suite passed;
+see the CI transport validation below for its configuration and evidence.
 
 Local source/fixture builds, HTTP readiness, authenticated product-list access,
 repeat installation, restart and reset passed on source `cdf21efc07`. A disposable
@@ -32,7 +33,7 @@ consecutive cloud browser login/product-list smoke runs then passed against
 that VM through a dedicated HTTPS endpoint with certificate verification.
 This establishes only the original smoke journey on that pinned environment.
 The testRigor tunnel registered there, but requests through its proxy port
-timed out; direct HTTPS bypasses that unresolved tunnel issue.
+timed out; those earlier direct VM HTTPS runs bypassed the tunnel.
 
 The expanded draft adds invalid-password rejection paired with successful
 login, and a category create/edit/delete lifecycle. The category case generates
@@ -44,7 +45,7 @@ test; never reset a shared application to make a test pass.
 All three cases passed together in five consecutive CLI runs against the same
 source-built VM image, with sequential execution, whole-test retries disabled
 and no categories left behind. This verifies only these admin journeys on that
-pinned environment; hosted CI and the localhost tunnel remain unverified.
+pinned environment; the later hosted CI validation is recorded separately below.
 
 The added cases exercise commerce behavior:
 
@@ -63,7 +64,7 @@ settings and VM image stayed unchanged, with sequential execution, whole-test
 retries disabled and zero step errors or warnings. Independent API postchecks
 and owned-record cleanup passed after every run. This verifies these four
 journeys on that pinned environment. The historical five-run result above
-covers only TC-01 through TC-03; hosted CI remains unverified.
+covers only TC-01 through TC-03, separately from the later hosted CI result.
 
 TC-08 and TC-09 passed three consecutive combined saved-suite browser runs on
 2026-11-18 UTC against the same VM image. Their case definitions, fixture rules,
@@ -75,7 +76,7 @@ shipped fulfillment and no new products remaining.
 A subsequent [full-nine regression](https://app.testrigor.com/test-suites/KuSw8XGMpEdAPFwh8/runs/vcPhagr8BLSzqxGNS)
 passed all nine saved cases with zero step errors or warnings. Both fixture
 postchecks and cleanup routines passed. This is one combined regression on the
-exposed VM; hosted nine-case CI and native localhost tunnel access remain unverified.
+exposed VM, separately from the later hosted HTTPS localhost result.
 
 Their reusable API rules create and clean
 their own products, customers and orders during execution, preserving TC-01's
@@ -297,7 +298,8 @@ The owner must coordinate local runs and other repositories using that suite;
 GitHub concurrency cannot serialize those callers. The job limit is 90 minutes,
 including a 60-minute source-build limit and 20-minute cloud-step limit. A timeout
 does not establish that the remote execution has stopped: inspect the suite
-before dispatching again. Runner build capacity and these limits remain unverified.
+before dispatching again. The HTTPS validation below completed its build and
+full-suite stages within these limits; runner capacity can vary.
 
 CLI, syntax and build output stay in ignored `.runtime/ci-raw/`. The evidence step
 redacts fixture environment values and the CI token, including XML/URL/JSON
@@ -340,8 +342,39 @@ initial HTTPS pass to protocol alone: it also changes hostname and port.
 
 Local proxy checks (no cloud execution): `python3 tests/E2E/test-ci-https.py`.
 They cover trusted HTML/assets/API requests, forwarded origin and both fixed-length
-and chunked request bodies, private-file
+and chunked request bodies, lowercase Content-Length normalization, Node fetch, private-file
 rejection, rejection of an untrusted certificate and SAN hostname verification.
+
+### CI transport validation, 2026-11-19 UTC
+
+[CI run 44587907660](https://github.com/AntonioVCruz/medusa/actions/runs/44587907660)
+passed on commit `bf73ff0cfdbe44913ed7a6a98740e595a4721c0b`, with CLI 3.0.0
+on Node 22.22.0. Every direct probe below returned HTTP 200 and the exact built
+Admin HTML. The HTTPS login ran before the full suite; its nine cases and
+independent commerce postchecks passed, with zero execution errors or warnings.
+
+| Selection | Exact URL | Allocated tunnel port | Browser outcome | testRigor run |
+| --- | --- | --- | --- | --- |
+| Login | `https://localhost:18443/app` | 45104 | Passed | [eXcZRtguXMkRuxbWC](https://app.testrigor.com/test-suites/KuSw8XGMpEdAPFwh8/runs/eXcZRtguXMkRuxbWC) |
+| Full suite | `https://localhost:18443/app` | 47582 | 9/9 passed | [v4Kqo9vX5L6zX5Ykf](https://app.testrigor.com/test-suites/KuSw8XGMpEdAPFwh8/runs/v4Kqo9vX5L6zX5Ykf) |
+| Login control | `http://127.0.0.1:19000/app` | 44679 | HTTP 502, then login assertions failed | [fusZxFQMLWBi7NNSc](https://app.testrigor.com/test-suites/KuSw8XGMpEdAPFwh8/runs/fusZxFQMLWBi7NNSc) |
+| Login control | `http://localhost:19000/app` | 45177 | Passed | [quoQbSTtPCtWXdQvn](https://app.testrigor.com/test-suites/KuSw8XGMpEdAPFwh8/runs/quoQbSTtPCtWXdQvn) |
+| Login control | `http://localhost:18443/app` | 45883 | Passed | [kGkrfMHsZ65HQ4We2](https://app.testrigor.com/test-suites/KuSw8XGMpEdAPFwh8/runs/kGkrfMHsZ65HQ4We2) |
+| Login repeat | `https://localhost:18443/app` | 47436 | Passed | [JickD7B5THro5CuF5](https://app.testrigor.com/test-suites/KuSw8XGMpEdAPFwh8/runs/JickD7B5THro5CuF5) |
+
+Changing only the hostname from 127.0.0.1 to localhost was sufficient for the
+HTTP login control on port 19000. HTTP and HTTPS also both passed on localhost
+port 18443, with the corresponding protocol active. These results do not show
+that HTTPS alone fixed the failure. They isolate the observed failure to the
+literal-IP URL in this runner/tunnel setup; the exact underlying tunnel
+component is not identified. The full suite was validated on HTTPS, not repeated
+on the HTTP controls. No certificate errors or connection timeouts were reported.
+
+The deliberate 502 control is recorded as a failed case; the workflow succeeds
+because the gated HTTPS suite and comparison collection succeeded. Every CLI
+invocation generated JUnit and stopped its tunnel. Both fixture cleanup routines,
+sanitized artifact upload and removal of the proxy/Compose fixture and volume
+passed. The artifacts contain neither PEM/key files nor private-key blocks.
 
 Upstream publication requires a linked issue assigned to the contributor, a
 description in the contributor's own words, and completion of Medusa's AI-usage
