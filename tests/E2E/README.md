@@ -247,25 +247,42 @@ Before enabling cloud execution, the repository owner must:
    separate approval. No fork PR code is executed with secrets by this workflow.
 
 The job uses Ubuntu 24.04, Node 22.22.0, exact CLI version 3.0.0 and SHA-pinned
-actions. It builds the checked-out source with the existing pinned Docker fixture;
-it does not test the previously deployed VM instead. After startup,
-`python3 tests/E2E/ci-support.py admin-probe` resolves the published loopback
-mapping with `docker compose port app 9000` and checks its `/app` URL using
-`curl --noproxy '*' --connect-timeout 5 --max-time 20`. It logs the URL, status,
+actions. It builds the checked-out source with the existing pinned Docker fixture.
+The backend remains on container port 9000, published only at 127.0.0.1:19000.
+CI starts `ci-proxy.py` on 127.0.0.1:18443 and uses
+`https://localhost:18443/app` for the browser. The proxy forwards Admin HTML,
+assets and API requests to the same Medusa service, preserving the Host/Origin
+and setting X-Forwarded-Proto. The Admin uses relative API URLs; the fixture's
+CORS configuration allows the explicit loopback origins used by these checks.
+This proxy is not part of the application or the ordinary local installer.
+
+`ci-proxy.sh` generates a one-day self-signed certificate with DNS SAN localhost.
+Its private key stays under `.runtime/tls/`, outside the evidence directory;
+the proxy serves only upstream responses, never a filesystem directory.
+The exact browser URL is checked with
+`curl --noproxy '*' --cacert <temporary-cert> --connect-timeout 5 --max-time 20`.
+This explicitly trusts the fixture certificate locally and verifies its hostname;
+it does not prove that the remote browser trusts it. Python API probes use that
+certificate as a CA and Node fixture helpers use `NODE_EXTRA_CA_CERTS`.
+Global TLS verification is not disabled. The probe logs the URL, status,
 redirect location and content type in the job and sanitized `admin-http.log`.
 The fixture must return HTTP 200 without a redirect, with HTML identical to its
 built `public/admin/index.html` and the Medusa mount element. A failure stops
 execution before testRigor; the always-running evidence collector captures the
 build and startup logs. The successful check exports `MEDUSA_E2E_URL` for the
-fixture helpers and CLI, currently `http://127.0.0.1:19000/app`.
+fixture helpers and CLI, `https://localhost:18443/app`.
 
 An authenticated API probe
 checks the image's source marker and empty products/categories before execution.
 Before execution it prepares the commerce fixtures and manual-shipping infrastructure.
 The CLI prints its installed version and saves it in `cli-version.txt`; the evidence
 collector records that actual version in `provenance.json` (or null if unavailable).
-It then runs with `--localhost --verbose`
-against that checked Admin URL and manages the tunnel itself. The standalone
+It runs with `--localhost --verbose` against that checked Admin URL and manages
+the tunnel itself. First, `ci-run.sh login login-https` selects the existing
+TC-01 through its `medusa-admin-smoke` label and requires exactly one passing
+JUnit case. Only then does `ci-run.sh full full-https` select the existing nine
+`medusa-admin-e2e` cases. Each invocation probes its exact URL before calling
+testRigor and writes separate CLI, direct-probe and JUnit files. The standalone
 `diagnose-tunnel.cjs` is used only by the separate diagnostic dispatch; a static
 page diagnostic does not establish actual Admin reachability.
 After a successful CLI exit
@@ -298,8 +315,32 @@ repository owner; upstream maintainer acceptance and a dedicated upstream suite
 are still open decisions. Revoke/replace the token when ownership changes or it
 is exposed, and update only the repository secret. To disable, remove the tunnel
 verification variable or CI token; to retire, remove the workflow, revoke the
-token and let retained artifacts expire. This workflow has been validated locally;
-no hosted build, tunnel pass or cloud CI result is claimed.
+token and let retained artifacts expire. Earlier hosted builds and direct HTTP
+checks passed; CLI 3.0.0 registered a tunnel but browsers received HTTP 502 at
+`http://127.0.0.1:19000/app`. Registration alone is not a browser pass.
+
+For the transport investigation, dispatch with `run_cloud=true`,
+`diagnose_tunnel=false` and `compare_transports=true`. After HTTPS login and
+the full suite pass, `ci-compare.py` repeats the unchanged login case sequentially:
+
+| Evidence name | Exact URL | Purpose |
+| --- | --- | --- |
+| http-ip-19000 | `http://127.0.0.1:19000/app` | Original HTTP control |
+| http-localhost-19000 | `http://localhost:19000/app` | Change hostname only |
+| http-localhost-18443 | `http://localhost:18443/app` | HTTP on the proxy port |
+| https-localhost-18443-repeat | `https://localhost:18443/app` | HTTPS on that same port |
+
+The same source, credentials, CLI version and login label are retained. The proxy
+switches protocols on port 18443 between the last two runs; the internal Medusa
+service stays on 9000 throughout. Comparison failures are expected observations,
+recorded in `transport-comparisons.txt` and per-run logs/JUnit; they do not replace
+the HTTPS full-suite result. An abnormal CLI termination aborts comparisons to
+avoid starting a run while another might still be active. Do not attribute an
+initial HTTPS pass to protocol alone: it also changes hostname and port.
+
+Local proxy checks (no cloud execution): `python3 tests/E2E/test-ci-https.py`.
+They cover trusted HTML/assets/API requests, forwarded origin/body, private-file
+rejection, rejection of an untrusted certificate and SAN hostname verification.
 
 Upstream publication requires a linked issue assigned to the contributor, a
 description in the contributor's own words, and completion of Medusa's AI-usage

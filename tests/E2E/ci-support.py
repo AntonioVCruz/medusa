@@ -5,6 +5,7 @@ import html
 import json
 import os
 import re
+import ssl
 from pathlib import Path
 import subprocess
 import sys
@@ -43,13 +44,19 @@ def request(path, data=None, token=None):
         data=json.dumps(data).encode() if data is not None else None,
         headers=headers,
     )
-    with urllib.request.urlopen(req, timeout=20) as response:
+    context = ssl.create_default_context(cafile=os.environ.get("MEDUSA_E2E_CA_CERT"))
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}),
+                                        urllib.request.HTTPSHandler(context=context))
+    with opener.open(req, timeout=20) as response:
         return json.load(response)
 
 
 def admin_probe():
     RAW.mkdir(parents=True, exist_ok=True)
-    log = RAW / "admin-http.log"
+    name = os.environ.get("MEDUSA_E2E_PROBE_NAME", "admin-http")
+    if not re.fullmatch(r"[a-z0-9-]+", name):
+        raise ValueError("Invalid probe evidence name")
+    log = RAW / (name + ".log")
 
     def record(message):
         print(message, flush=True)
@@ -61,16 +68,24 @@ def admin_probe():
     published = compose("port", "app", "9000").strip()
     if not re.fullmatch(r"127\.0\.0\.1:[0-9]+", published):
         raise ValueError("Expected one IPv4 loopback-only app port mapping")
-    url = "http://" + published + "/app"
+    url = os.environ.get("MEDUSA_E2E_URL", "http://" + published + "/app")
+    if url not in {"http://" + published + "/app", "http://localhost:19000/app",
+                   "https://localhost:18443/app", "http://localhost:18443/app"}:
+        raise ValueError("Expected a supported loopback Admin URL")
     record("Admin URL: " + url)
     record("Proxy bypass: --noproxy '*'; no redirects followed; connect timeout 5s, total timeout 20s")
-    body = RAW / "admin-http.html"
+    body = RAW / (name + ".html")
+    trust = []
+    if url.startswith("https://"):
+        trust = ["--cacert", os.environ["MEDUSA_E2E_CA_CERT"]]
+        record("Local TLS trust: --cacert trusts only this temporary localhost certificate; "
+               "this does not establish remote browser certificate trust")
     response = subprocess.run([
         "curl", "--noproxy", "*", "--silent", "--show-error",
         "--connect-timeout", "5", "--max-time", "20",
         "--output", str(body),
         "--write-out", "%{http_code}\\n%{redirect_url}\\n%{content_type}\\n",
-        url,
+        *trust, url,
     ], capture_output=True, text=True, timeout=25)
     fields = response.stdout.splitlines()
     status, location, content_type = (fields + ["", "", ""])[:3]
@@ -125,6 +140,14 @@ def result():
     print("Nine cases passed; commerce outcomes, source and empty catalogs rechecked")
 
 
+def login_result():
+    root = ET.parse(os.environ.get("MEDUSA_E2E_LOGIN_REPORT", RAW / "junit-login-https.xml")).getroot()
+    if len(list(root.iter("testcase"))) != 1 or any(
+            list(root.iter(tag)) for tag in ("failure", "error", "skipped")):
+        raise ValueError("Expected exactly one passing Admin login case")
+    print("HTTPS Admin login passed without failures, errors or skips")
+
+
 def collect():
     RAW.mkdir(parents=True, exist_ok=True)
     if (STATE / "image.env").exists():
@@ -172,7 +195,8 @@ def collect():
 
 if __name__ == "__main__":
     try:
-        {"admin-probe": admin_probe, "probe": probe, "result": result, "collect": collect}[sys.argv[1]]()
+        {"admin-probe": admin_probe, "probe": probe, "result": result,
+         "login-result": login_result, "collect": collect}[sys.argv[1]]()
     except Exception as error:
         # Exception text may contain HTTP responses or credentials from subprocess output.
         print("CI verification failed: " + type(error).__name__, file=sys.stderr)

@@ -11,6 +11,10 @@ on:
         description: Probe runner tunnel HTTP connectivity without credentials or browser tests
         type: boolean
         default: false
+      compare_transports:
+        description: Compare the same login case across loopback hostnames and protocols after HTTPS passes
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -110,7 +114,17 @@ jobs:
         shell: bash
         run: bash tests/E2E/install-medusa.sh install > tests/E2E/.runtime/ci-raw/build.log 2>&1
 
-      - name: Check actual Admin directly on runner loopback
+      - name: Start CI-only HTTPS loopback proxy
+        timeout-minutes: 2
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash tests/E2E/ci-proxy.sh https
+          echo "MEDUSA_E2E_CA_CERT=$GITHUB_WORKSPACE/tests/E2E/.runtime/tls/cert.pem" >> "$GITHUB_ENV"
+          echo "NODE_EXTRA_CA_CERTS=$GITHUB_WORKSPACE/tests/E2E/.runtime/tls/cert.pem" >> "$GITHUB_ENV"
+          echo 'MEDUSA_E2E_URL=https://localhost:18443/app' >> "$GITHUB_ENV"
+
+      - name: Check exact HTTPS Admin URL with temporary certificate trust
         timeout-minutes: 2
         shell: bash
         run: python3 tests/E2E/ci-support.py admin-probe
@@ -127,8 +141,8 @@ jobs:
           node tests/E2E/prepare-order-infrastructure.mjs prepare >> tests/E2E/.runtime/ci-raw/fixture.log 2>&1
           node tests/E2E/prepare-variables.mjs
 
-      - name: Validate and run the nine admin cases
-        timeout-minutes: 20
+      - name: Validate syntax and run HTTPS Admin login first
+        timeout-minutes: 8
         env:
           TESTRIGOR_API_KEY: ${{ secrets.TESTRIGOR_CI_TOKEN }}
         shell: bash
@@ -138,17 +152,22 @@ jobs:
             --test-cases-path 'tests/E2E/test-cases/**/*.yaml' \
             --rules-path 'tests/E2E/rules/**/*.yaml' \
             > tests/E2E/.runtime/ci-raw/syntax.log 2>&1
-          testrigor test-suite run "$TESTRIGOR_SUITE_ID" \
-            --localhost --verbose --url "$MEDUSA_E2E_URL" \
-            --test-cases-path 'tests/E2E/test-cases/**/*.yaml' \
-            --rules-path 'tests/E2E/rules/**/*.yaml' \
-            --variables-path tests/E2E/.runtime/variables.json \
-            --settings-path tests/E2E/settings.json \
-            --labels medusa-admin-e2e \
-            --branch "$HARNESS_BRANCH" --commit "$HARNESS_COMMIT" \
-            --junit-report-save-path tests/E2E/.runtime/ci-raw/junit.xml \
-            > tests/E2E/.runtime/ci-raw/cli.log 2>&1
-          python3 tests/E2E/ci-support.py result
+          bash tests/E2E/ci-run.sh login login-https
+
+      - name: Run full Admin suite after HTTPS login passes
+        timeout-minutes: 20
+        env:
+          TESTRIGOR_API_KEY: ${{ secrets.TESTRIGOR_CI_TOKEN }}
+        shell: bash
+        run: bash tests/E2E/ci-run.sh full full-https
+
+      - name: Compare hostname and protocol with the same login case
+        if: success() && inputs.compare_transports
+        timeout-minutes: 25
+        env:
+          TESTRIGOR_API_KEY: ${{ secrets.TESTRIGOR_CI_TOKEN }}
+        shell: bash
+        run: python3 tests/E2E/ci-compare.py
 
       - name: Clean up test-owned commerce data
         if: always()
@@ -191,6 +210,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          bash tests/E2E/ci-proxy.sh stop
           if [[ -f tests/E2E/.runtime/environment.env && -f tests/E2E/.runtime/image.env ]]; then
             docker compose --project-name medusa-testrigor-e2e \
               --env-file tests/E2E/.runtime/environment.env \
