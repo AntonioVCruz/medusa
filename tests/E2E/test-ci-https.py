@@ -4,6 +4,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import importlib.util
 import http.client
 import json
+import os
 from pathlib import Path
 import shutil
 import ssl
@@ -40,6 +41,7 @@ class Upstream(BaseHTTPRequestHandler):
 
     def do_POST(self):
         body = self.rfile.read(int(self.headers["Content-Length"]))
+        assert self.headers.get_all("Content-Length") == [str(len(body))]
         seen.append((self.path, dict(self.headers), body))
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
@@ -100,6 +102,24 @@ with tempfile.TemporaryDirectory() as temp:
                 assert seen[-1][2] == b'{"synthetic":true}'
                 assert seen[-1][1]["Content-Length"] == "18"
                 assert "Transfer-Encoding" not in seen[-1][1]
+                connection = http.client.HTTPSConnection(
+                    "localhost", server.server_port,
+                    context=ssl.create_default_context(cafile=str(cert)), timeout=5)
+                connection.request("POST", "/auth/user/emailpass", body=b'{"synthetic":true}',
+                                   headers={"content-length": "18", "Content-Type": "application/json"})
+                assert json.loads(connection.getresponse().read()) == {"ok": True}
+                connection.close()
+                assert seen[-1][2] == b'{"synthetic":true}'
+                subprocess.run([
+                    "node", "--input-type=module", "-e",
+                    'const origin = process.argv[1]; const r = await fetch(origin + "/auth/user/emailpass", '
+                    '{method: "POST", headers: {"Content-Type": "application/json", Origin: origin}, '
+                    'body: JSON.stringify({synthetic: true})}); '
+                    'if (r.status !== 200 || !(await r.json()).ok) throw new Error("Node API proxy failed");',
+                    origin,
+                ], env=dict(os.environ, NODE_EXTRA_CA_CERTS=str(cert)),
+                    check=True, capture_output=True, timeout=20)
+                assert seen[-1][2] == b'{"synthetic":true}'
                 for path in ["/private/key.pem", "/.runtime/tls/key.pem"]:
                     try:
                         trusted.open(origin + path)

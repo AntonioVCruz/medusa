@@ -50,7 +50,7 @@ class Proxy(BaseHTTPRequestHandler):
                 part.strip().lower() for part in self.headers.get("Connection", "").split(",")
             }
             headers = {key: value for key, value in self.headers.items()
-                       if key.lower() not in HOP_HEADERS | connection_headers}
+                       if key.lower() not in HOP_HEADERS | connection_headers | {"content-length"}}
             headers["X-Forwarded-Proto"] = self.server.scheme
             headers["X-Forwarded-Host"] = self.headers.get("Host", "localhost:18443")
             if body is not None:
@@ -58,6 +58,10 @@ class Proxy(BaseHTTPRequestHandler):
             upstream.request(self.command, self.path, body=body, headers=headers)
             response = upstream.getresponse()
             content = response.read()
+            if self.path == "/auth/user/emailpass":
+                framing = "chunked" if self.headers.get("Transfer-Encoding", "").lower() == "chunked" else "content-length"
+                print(f"Auth proxy: framing={framing}, bytes={len(body or b'')}, "
+                      f"upstream_status={response.status}", flush=True)
             self.send_response(response.status)
             for key, value in response.getheaders():
                 if key.lower() not in HOP_HEADERS | {"content-length"}:
