@@ -1164,6 +1164,77 @@ medusaIntegrationTestRunner({
         })
       })
 
+      describe("when cancelling an edit", () => {
+        let promotion
+
+        beforeEach(async () => {
+          promotion = (
+            await api.post(
+              "/admin/promotions",
+              {
+                code: "linked-promo",
+                type: "standard",
+                status: "active",
+                application_method: {
+                  type: "fixed",
+                  target_type: "items",
+                  allocation: "each",
+                  currency_code: "usd",
+                  value: 100,
+                  max_quantity: 5,
+                },
+                is_automatic: false,
+              },
+              adminHeaders
+            )
+          ).data.promotion
+
+          await api.post(
+            `/admin/draft-orders/${testDraftOrder.id}/edit`,
+            {},
+            adminHeaders
+          )
+          await api.post(
+            `/admin/draft-orders/${testDraftOrder.id}/edit/promotions`,
+            { promo_codes: [promotion.code] },
+            adminHeaders
+          )
+          await api.post(
+            `/admin/draft-orders/${testDraftOrder.id}/edit/confirm`,
+            {},
+            adminHeaders
+          )
+        })
+
+        it("should keep a promotion already linked to the draft order when it is re-added and the edit is cancelled", async () => {
+          await api.post(
+            `/admin/draft-orders/${testDraftOrder.id}/edit`,
+            {},
+            adminHeaders
+          )
+          await api.post(
+            `/admin/draft-orders/${testDraftOrder.id}/edit/promotions`,
+            { promo_codes: [promotion.code] },
+            adminHeaders
+          )
+          await api.delete(
+            `/admin/draft-orders/${testDraftOrder.id}/edit`,
+            adminHeaders
+          )
+
+          const draftOrder = (
+            await api.get(
+              `/admin/draft-orders/${testDraftOrder.id}?fields=+promotions.code`,
+              adminHeaders
+            )
+          ).data.draft_order
+
+          expect(draftOrder.promotions).toEqual([
+            expect.objectContaining({ code: promotion.code }),
+          ])
+        })
+      })
+
       describe("with promotion rules", () => {
         let taggedProduct
         let untaggedProduct
@@ -1681,6 +1752,52 @@ medusaIntegrationTestRunner({
             is_custom_amount: true,
           }),
         ])
+      })
+
+      it("should save metadata and description when adding a shipping method", async () => {
+        await api.post(
+          `/admin/draft-orders/${testDraftOrder.id}/edit`,
+          {},
+          adminHeaders
+        )
+
+        const preview = (
+          await api.post(
+            `/admin/draft-orders/${testDraftOrder.id}/edit/shipping-methods`,
+            {
+              shipping_option_id: shippingOptionHeavy.id,
+              description: "Leave at the door",
+              metadata: { delivery_option: "pickup" },
+            },
+            adminHeaders
+          )
+        ).data.draft_order_preview
+
+        const addedMethod = preview.shipping_methods.find(
+          (method) => method.shipping_option_id === shippingOptionHeavy.id
+        )
+
+        await api.post(
+          `/admin/draft-orders/${testDraftOrder.id}/edit/confirm`,
+          {},
+          adminHeaders
+        )
+
+        const order = (
+          await api.get(
+            `/admin/draft-orders/${testDraftOrder.id}?fields=+shipping_methods.metadata,+shipping_methods.description`,
+            adminHeaders
+          )
+        ).data.draft_order
+
+        expect(
+          order.shipping_methods.find((method) => method.id === addedMethod.id)
+        ).toEqual(
+          expect.objectContaining({
+            description: "Leave at the door",
+            metadata: { delivery_option: "pickup" },
+          })
+        )
       })
     })
 
