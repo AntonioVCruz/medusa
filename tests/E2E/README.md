@@ -155,3 +155,11 @@ passing cases; the login selection requires exactly one.
 
 Local proxy regression checks need Python 3, OpenSSL and Node, without Docker or
 cloud execution: `python3 tests/E2E/test-ci-https.py`.
+
+## Verification
+
+[Fork CI validation, 2026-11-20](https://github.com/AntonioVCruz/medusa/actions/runs/44757374263)
+passed login, all nine cases, independent commerce postchecks and cleanup on
+Medusa 2.23.0 at `fa698ac2b6`, with CLI 3.0.0. The nine-case run had
+2 recovered action-retry warnings. This is evidence for that source-built
+configuration; it does not establish reliability across other revisions.
