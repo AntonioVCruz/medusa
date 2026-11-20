@@ -1,0 +1,9 @@
+customSteps: |
+  medusa-admin-sign-in
+  click "Products"
+  check that page contains "Create your first product to start selling."
+  check that page contains "Create"
+  check that page contains "Export"
+labels:
+  - medusa-admin-smoke
+  - medusa-admin-e2e

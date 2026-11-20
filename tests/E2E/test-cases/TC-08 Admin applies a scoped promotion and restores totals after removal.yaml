@@ -1,0 +1,57 @@
+customSteps: |
+  medusa-admin-sign-in
+  medusa-prepare-scoped-promotion
+  reload
+  click "Promotions"
+  click "Create"
+  click "Percentage off product"
+  click "Continue"
+  click "Active"
+  enter stored value "promotionCode" into "Code"
+  enter "10" into "Promotion Value"
+  enter "2" into "Maximum Quantity"
+  click "Add condition" below "What items will the promotion be applied to?"
+  click "Select Attribute" below "What items will the promotion be applied to?"
+  click "Product"
+  scroll down on "Promotion Value"
+  click "Select Operator"
+  click "In"
+  click "Select values"
+  click stored value "eligibleTitle"
+  click "Promotion Value"
+  click "Continue"
+  click "Without Campaign"
+  click exactly "Save"
+  check that page doesn't contain "Without Campaign" and stop test if fails
+  check that page contains stored value from "promotionCode" and stop test if fails
+  reload
+  check that page contains stored value from "eligibleTitle" and stop test if fails
+  click "Orders"
+  click "Draft Orders"
+  click stored value "promotionEmail"
+  check that page contains "60.00 EUR" to the right of "Total" and stop test if fails
+  click button to the right of "Summary"
+  click "Edit promotions"
+  click dropdown below "Apply promotions"
+  copy to clipboard from "promotionCode"
+  paste from clipboard
+  click stored value "promotionCode"
+  click "Save"
+  check that page doesn't contain "Edit Promotions"
+  reload
+  check that page contains "55.00 EUR" to the right of "Total" and stop test if fails
+  check that page contains "€5.00" to the right of "Discount"
+  check that page contains "€10.00"
+  click button to the right of "Summary"
+  click "Edit promotions"
+  click button to the right of stored value "promotionCode"
+  click "Save"
+  check that page doesn't contain "Edit Promotions"
+  reload
+  check that page contains "60.00 EUR" to the right of "Total" and stop test if fails
+  check that page doesn't contain "55.00 EUR"
+  medusa-clean-scoped-promotion
+labels:
+- medusa-admin-e2e
+- medusa-admin-orders
+- medusa-admin-promotions

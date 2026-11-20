@@ -1,0 +1,12 @@
+{
+  "name": "medusa-admin-e2e-fixture",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Isolated application using the monorepo's built workspace packages",
+  "dependencies": {
+    "@medusajs/admin-sdk": "file:/source/packages/admin/admin-sdk",
+    "@medusajs/cli": "file:/source/packages/cli/medusa-cli",
+    "@medusajs/framework": "file:/source/packages/core/framework",
+    "@medusajs/medusa": "file:/source/packages/medusa"
+  }
+}

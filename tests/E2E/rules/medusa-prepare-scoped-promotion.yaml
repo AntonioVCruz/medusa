@@ -1,0 +1,28 @@
+steps: |
+  medusa-e2e-api-sign-in
+  generate from regex "[a-z]{16}", and save as "caseSuffix"
+  save string with parameters "e2etc08-${caseSuffix}-eligible" as "eligibleTitle"
+  save string with parameters "e2etc08-${caseSuffix}-control" as "controlTitle"
+  save string with parameters "e2etc08-${caseSuffix}@medusa-e2e.test" as "promotionEmail"
+  save string with parameters "e2etc08promo${caseSuffix}" as "promotionCode"
+  save string with parameters "${e2eApiBase}/admin/products" as "apiUrl"
+  save string with parameters "{\"title\":\"${eligibleTitle}\",\"handle\":\"e2etc08-${caseSuffix}-eligible\",\"status\":\"published\",\"discountable\":true,\"shipping_profile_id\":\"${e2eShippingProfileId}\",\"sales_channels\":[{\"id\":\"${e2eOrderChannelId}\"}],\"options\":[{\"title\":\"Default\",\"values\":[\"Default\"]}],\"variants\":[{\"title\":\"Default\",\"sku\":\"e2etc08-${caseSuffix}-eligible\",\"manage_inventory\":false,\"prices\":[{\"currency_code\":\"eur\",\"amount\":25}],\"options\":{\"Default\":\"Default\"}}],\"metadata\":{\"e2e_owner\":\"medusa-admin-e2e-08-09\",\"e2e_case\":\"TC-08\",\"e2e_run\":\"${caseSuffix}\"}}" as "requestBody"
+  call api post stored value "apiUrl" with headers "Content-Type:application/json" and stored value "apiAuthorization" and body stored value "requestBody" and get "$.product.id" and save it as "eligibleProductId" and then check that http code is 200
+  save string with parameters "${e2eApiBase}/admin/products/${eligibleProductId}?fields=*variants" as "apiUrl"
+  call api get stored value "apiUrl" with headers "Content-Type:application/json" and stored value "apiAuthorization" and get "$.product.variants[0].id" and save it as "eligibleVariantId" and then check that http code is 200
+  save string with parameters "${e2eApiBase}/admin/products" as "apiUrl"
+  save string with parameters "{\"title\":\"${controlTitle}\",\"handle\":\"e2etc08-${caseSuffix}-control\",\"status\":\"published\",\"discountable\":true,\"shipping_profile_id\":\"${e2eShippingProfileId}\",\"sales_channels\":[{\"id\":\"${e2eOrderChannelId}\"}],\"options\":[{\"title\":\"Default\",\"values\":[\"Default\"]}],\"variants\":[{\"title\":\"Default\",\"sku\":\"e2etc08-${caseSuffix}-control\",\"manage_inventory\":false,\"prices\":[{\"currency_code\":\"eur\",\"amount\":10}],\"options\":{\"Default\":\"Default\"}}],\"metadata\":{\"e2e_owner\":\"medusa-admin-e2e-08-09\",\"e2e_case\":\"TC-08\",\"e2e_run\":\"${caseSuffix}\"}}" as "requestBody"
+  call api post stored value "apiUrl" with headers "Content-Type:application/json" and stored value "apiAuthorization" and body stored value "requestBody" and get "$.product.id" and save it as "controlProductId" and then check that http code is 200
+  save string with parameters "${e2eApiBase}/admin/products/${controlProductId}?fields=*variants" as "apiUrl"
+  call api get stored value "apiUrl" with headers "Content-Type:application/json" and stored value "apiAuthorization" and get "$.product.variants[0].id" and save it as "controlVariantId" and then check that http code is 200
+  save string with parameters "${e2eApiBase}/admin/customers" as "apiUrl"
+  save string with parameters "{\"email\":\"${promotionEmail}\",\"metadata\":{\"e2e_owner\":\"medusa-admin-e2e-08-09\",\"e2e_case\":\"TC-08\",\"e2e_run\":\"${caseSuffix}\"}}" as "requestBody"
+  call api post stored value "apiUrl" with headers "Content-Type:application/json" and stored value "apiAuthorization" and body stored value "requestBody" and get "$.customer.id" and save it as "promotionCustomerId" and then check that http code is 200
+  save string with parameters "${e2eApiBase}/admin/draft-orders" as "apiUrl"
+  save string with parameters "{\"region_id\":\"${e2eOrderRegionId}\",\"sales_channel_id\":\"${e2eOrderChannelId}\",\"customer_id\":\"${promotionCustomerId}\",\"shipping_address\":{\"first_name\":\"E2E\",\"last_name\":\"TC-08\",\"address_1\":\"1 Test Street\",\"city\":\"Berlin\",\"postal_code\":\"10115\",\"country_code\":\"de\"},\"billing_address\":{\"first_name\":\"E2E\",\"last_name\":\"TC-08\",\"address_1\":\"1 Test Street\",\"city\":\"Berlin\",\"postal_code\":\"10115\",\"country_code\":\"de\"},\"items\":[{\"variant_id\":\"${eligibleVariantId}\",\"unit_price\":25,\"quantity\":2},{\"variant_id\":\"${controlVariantId}\",\"unit_price\":10,\"quantity\":1}],\"no_notification_order\":true,\"metadata\":{\"e2e_owner\":\"medusa-admin-e2e-08-09\",\"e2e_case\":\"TC-08\",\"e2e_run\":\"${caseSuffix}\"}}" as "requestBody"
+  call api post stored value "apiUrl" with headers "Content-Type:application/json" and stored value "apiAuthorization" and body stored value "requestBody" and get "$.draft_order.id" and save it as "promotionDraftId" and then check that http code is 200
+  save string with parameters "${e2eApiBase}/admin/draft-orders/${promotionDraftId}?fields=%2Btotal" as "apiUrl"
+  call api get stored value "apiUrl" with headers "Content-Type:application/json" and stored value "apiAuthorization" and get "$.draft_order.total" and save it as "promotionBaseline" and then check that http code is 200
+  check that stored value "promotionBaseline" itself is equal as a number to "60" and stop test if fails
+labels:
+- medusa-api-fixture

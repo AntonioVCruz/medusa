@@ -1,0 +1,51 @@
+customSteps: |
+  medusa-admin-sign-in
+  medusa-prepare-partial-order
+  reload
+  click "Inventory"
+  click stored value "partialProduct"
+  check that table at row stored value "e2eFulfillmentWarehouse" and column "In stock" contains "10"
+  check that table at row stored value "e2eFulfillmentWarehouse" and column "Reserved" contains "3"
+  check that table at row stored value "e2eFulfillmentWarehouse" and column "Available" contains "7"
+  click "Orders"
+  click string with parameters "#${partialOrderNumber}"
+  check that page contains string with parameters "#${partialOrderNumber}"
+  click button to the right of "Awaiting fulfillment"
+  click "Fulfill items"
+  click "Location"
+  click stored value "e2eFulfillmentWarehouse"
+  click "Shipping method"
+  click stored value "e2eShippingOption"
+  check that input to the right of "In stock" has value "3" and stop test if fails
+  click input to the right of "In stock"
+  type arrow right
+  type backspace
+  type "2"
+  type tab
+  check that input to the right of "In stock" has value "2" and stop test if fails
+  click "Create fulfillment"
+  check that page doesn't contain "Items to fulfill"
+  scroll up
+  check that page contains "Partially fulfilled" and stop test if fails
+  reload
+  check that page contains "Partially fulfilled"
+  check that page contains "Unfulfilled Items"
+  check that page contains string with parameters "2x ${partialProduct}"
+  click "Mark as shipped"
+  click "Save"
+  check that page doesn't contain "Mark fulfillment shipped"
+  scroll up
+  check that page contains "Partially shipped" and stop test if fails
+  reload
+  check that page contains "Partially shipped"
+  click "Inventory"
+  click stored value "partialProduct"
+  reload
+  check that table at row stored value "e2eFulfillmentWarehouse" and column "In stock" contains "8"
+  check that table at row stored value "e2eFulfillmentWarehouse" and column "Reserved" contains "1"
+  check that table at row stored value "e2eFulfillmentWarehouse" and column "Available" contains "7"
+  medusa-clean-partial-order
+labels:
+- medusa-admin-e2e
+- medusa-admin-orders
+- medusa-admin-fulfillment

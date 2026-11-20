@@ -1,0 +1,31 @@
+customSteps: |
+  medusa-admin-sign-in
+  click "Customers"
+  click "Customer Groups"
+  click stored value "e2eGroup"
+  check that page contains "This group doesn't have customers."
+  click "Add"
+  enter stored value "e2eCustomer" into "Search"
+  click checkbox to the left of stored value "e2eCustomer"
+  click "Save"
+  reload
+  check that page contains stored value from "e2eCustomer"
+  click stored value "e2eCustomer"
+  check that page contains stored value from "e2eGroup"
+  reload
+  check that page contains stored value from "e2eGroup"
+  click stored value "e2eGroup"
+  click checkbox to the left of stored value "e2eCustomer"
+  click "Remove"
+  click "Continue"
+  reload
+  check that page doesn't contain stored value from "e2eCustomer"
+  click "Customers"
+  enter stored value "e2eCustomer" into "Search"
+  click stored value "e2eCustomer"
+  check that page contains stored value from "e2eCustomer"
+  check that page doesn't contain stored value from "e2eGroup"
+labels:
+  - medusa-admin-e2e
+  - medusa-admin-expansion
+  - medusa-admin-customer-groups

@@ -1,0 +1,8 @@
+steps: |
+  check that page contains "Welcome to Medusa"
+  enter stored value "adminEmail" into "Email"
+  enter stored value "adminPassword" into "Password"
+  click "Continue with Email"
+  check that page doesn't contain "Continue with Email"
+labels:
+  - medusa-admin-smoke

@@ -1,0 +1,40 @@
+customSteps: |
+  medusa-admin-sign-in
+  click "Products"
+  click "Categories"
+  check that page contains "Categories"
+  click "Create"
+  check that page contains "Create Category"
+  generate from regex "e2e[a-z]{20}", then enter into "Title" and save as "categoryName"
+  enter stored value "categoryName" into "Handle"
+  enter "Created by the isolated category lifecycle test" into "Description"
+  click "Continue"
+  click "Save"
+  check that page doesn't contain "Create Category"
+  reload
+  check that page contains stored value from "categoryName"
+  check that page contains "Created by the isolated category lifecycle test"
+  // The status badge identifies the category menu, unlike the duplicated breadcrumb name.
+  click button to the right of "Public"
+  click "Edit"
+  check that page contains "Edit Category"
+  save string with parameters "${categoryName} updated" as "updatedCategoryName"
+  enter stored value "updatedCategoryName" into "Title"
+  enter "Updated by the isolated category lifecycle test" into "Description"
+  click "Save"
+  check that page doesn't contain "Edit Category"
+  reload
+  check that page contains stored value from "updatedCategoryName"
+  check that page contains "Updated by the isolated category lifecycle test"
+  click button to the right of "Public"
+  click "Delete"
+  check that page contains "Are you sure?"
+  click "Delete"
+  check that page doesn't contain "Are you sure?"
+  check that page contains "Organize products into categories, and manage those categories' ranking and hierarchy."
+  reload
+  check that page doesn't contain stored value from "updatedCategoryName"
+  check that page doesn't contain stored value from "categoryName"
+labels:
+  - medusa-admin-e2e
+  - medusa-admin-categories

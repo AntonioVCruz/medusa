@@ -1,0 +1,39 @@
+services:
+  postgres:
+    image: postgres:15.15-bookworm@sha256:c2820d612da95f7e03f07785878a4de220a53aaaeea351f0f2fa0a4a72ec4e50
+    environment:
+      POSTGRES_DB: medusa_e2e
+      POSTGRES_USER: medusa
+      POSTGRES_PASSWORD: ${E2E_DATABASE_PASSWORD:?Run the installer first}
+    volumes:
+      - database:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U medusa -d medusa_e2e"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+  app:
+    image: ${E2E_IMAGE:?Run the installer first}
+    env_file: .runtime/environment.env
+    environment:
+      DATABASE_URL: postgres://medusa:${E2E_DATABASE_PASSWORD}@postgres:5432/medusa_e2e?sslmode=disable
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 9000
+    ports:
+      - "127.0.0.1:19000:9000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:9000/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+      interval: 5s
+      timeout: 5s
+      retries: 60
+      start_period: 30s
+volumes:
+  database:

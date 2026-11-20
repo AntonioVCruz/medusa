@@ -1,0 +1,15 @@
+steps: |
+  save string with parameters "${e2eApiBase}/admin/promotions?code=${promotionCode}" as "apiUrl"
+  call api get stored value "apiUrl" with headers "Content-Type:application/json" and stored value "apiAuthorization" and get "$.promotions[0].id" and save it as "createdPromotionId" and then check that http code is 200
+  save string with parameters "${e2eApiBase}/admin/draft-orders/${promotionDraftId}" as "apiUrl"
+  call api delete stored value "apiUrl" with headers "Content-Type:application/json" and stored value "apiAuthorization" and then check that http code is 200
+  save string with parameters "${e2eApiBase}/admin/promotions/${createdPromotionId}" as "apiUrl"
+  call api delete stored value "apiUrl" with headers "Content-Type:application/json" and stored value "apiAuthorization" and then check that http code is 200
+  save string with parameters "${e2eApiBase}/admin/products/${eligibleProductId}" as "apiUrl"
+  call api delete stored value "apiUrl" with headers "Content-Type:application/json" and stored value "apiAuthorization" and then check that http code is 200
+  save string with parameters "${e2eApiBase}/admin/products/${controlProductId}" as "apiUrl"
+  call api delete stored value "apiUrl" with headers "Content-Type:application/json" and stored value "apiAuthorization" and then check that http code is 200
+  save string with parameters "${e2eApiBase}/admin/customers/${promotionCustomerId}" as "apiUrl"
+  call api delete stored value "apiUrl" with headers "Content-Type:application/json" and stored value "apiAuthorization" and then check that http code is 200
+labels:
+- medusa-api-fixture

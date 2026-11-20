@@ -1,0 +1,170 @@
+name: Admin E2E (opt-in)
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_cloud:
+        description: Run the nine admin cases after configuring and verifying the tunnel
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: medusa-testrigor-${{ vars.TESTRIGOR_SUITE_ID || 'unconfigured' }}
+  cancel-in-progress: false
+
+jobs:
+  config:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      enabled: ${{ steps.check.outputs.enabled }}
+    steps:
+      - name: Check opt-in and configuration
+        id: check
+        shell: bash
+        env:
+          RUN_CLOUD: ${{ inputs.run_cloud }}
+          SUITE_ID: ${{ vars.TESTRIGOR_SUITE_ID }}
+          CI_TOKEN: ${{ secrets.TESTRIGOR_CI_TOKEN }}
+          TUNNEL_VERIFIED: ${{ vars.TESTRIGOR_TUNNEL_VERIFIED }}
+        run: |
+          set -euo pipefail
+          if [[ "$RUN_CLOUD" == true && -n "$SUITE_ID" && -n "$CI_TOKEN" && "$TUNNEL_VERIFIED" == true ]]; then
+            echo 'enabled=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'enabled=false' >> "$GITHUB_OUTPUT"
+            echo '::notice::E2E skipped: requires explicit opt-in, suite ID, CI token and verified runner tunnel. See tests/E2E/README.md.'
+          fi
+
+  e2e:
+    needs: config
+    if: needs.config.outputs.enabled == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      TESTRIGOR_SUITE_ID: ${{ vars.TESTRIGOR_SUITE_ID }}
+      HARNESS_BRANCH: ${{ github.ref_name }}
+      HARNESS_COMMIT: ${{ github.sha }}
+      E2E_BUILD_CONCURRENCY: "2"
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22.22.0"
+
+      - name: Prepare private logs and install pinned CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -p tests/E2E/.runtime/ci-raw tests/E2E/.run
+          echo "TESTRIGOR_CLI_HOME=$RUNNER_TEMP/medusa-testrigor-cli" >> "$GITHUB_ENV"
+          npm install --global @testrigor/testrigor-cli@3.0.0 > tests/E2E/.runtime/ci-raw/cli-install.log 2>&1
+          testrigor --version | tee tests/E2E/.runtime/ci-raw/cli-version.txt
+
+      - name: Build and start this checkout
+        timeout-minutes: 60
+        shell: bash
+        run: bash tests/E2E/install-medusa.sh install > tests/E2E/.runtime/ci-raw/build.log 2>&1
+
+      - name: Start CI-only HTTPS loopback proxy
+        timeout-minutes: 2
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash tests/E2E/ci-proxy.sh start
+          echo "MEDUSA_E2E_CA_CERT=$GITHUB_WORKSPACE/tests/E2E/.runtime/tls/cert.pem" >> "$GITHUB_ENV"
+          echo "NODE_EXTRA_CA_CERTS=$GITHUB_WORKSPACE/tests/E2E/.runtime/tls/cert.pem" >> "$GITHUB_ENV"
+          echo 'MEDUSA_E2E_URL=https://localhost:18443/app' >> "$GITHUB_ENV"
+
+      - name: Check exact HTTPS Admin URL with temporary certificate trust
+        timeout-minutes: 2
+        shell: bash
+        run: python3 tests/E2E/ci-support.py admin-probe
+
+      - name: Verify source, authentication and empty catalog
+        shell: bash
+        run: python3 tests/E2E/ci-support.py probe
+
+      - name: Prepare test-owned commerce data
+        shell: bash
+        run: |
+          set -euo pipefail
+          node tests/E2E/prepare-commerce-fixture.mjs prepare > tests/E2E/.runtime/ci-raw/fixture.log 2>&1
+          node tests/E2E/prepare-order-infrastructure.mjs prepare >> tests/E2E/.runtime/ci-raw/fixture.log 2>&1
+          node tests/E2E/prepare-variables.mjs
+
+      - name: Validate syntax and run HTTPS Admin login first
+        timeout-minutes: 8
+        env:
+          TESTRIGOR_API_KEY: ${{ secrets.TESTRIGOR_CI_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          testrigor test-suite validate-syntax "$TESTRIGOR_SUITE_ID" \
+            --test-cases-path 'tests/E2E/test-cases/**/*.yaml' \
+            --rules-path 'tests/E2E/rules/**/*.yaml' \
+            > tests/E2E/.runtime/ci-raw/syntax.log 2>&1
+          bash tests/E2E/ci-run.sh login login-https
+
+      - name: Run full Admin suite after HTTPS login passes
+        timeout-minutes: 20
+        env:
+          TESTRIGOR_API_KEY: ${{ secrets.TESTRIGOR_CI_TOKEN }}
+        shell: bash
+        run: bash tests/E2E/ci-run.sh full full-https
+
+      - name: Clean up test-owned commerce data
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          cleanup_status=0
+          if [[ -f tests/E2E/.runtime/order-infrastructure.json ]]; then
+            node tests/E2E/prepare-order-infrastructure.mjs cleanup >> tests/E2E/.runtime/ci-raw/fixture.log 2>&1 || cleanup_status=1
+          fi
+          if [[ -f tests/E2E/.runtime/commerce-fixture.json ]]; then
+            node tests/E2E/prepare-commerce-fixture.mjs cleanup >> tests/E2E/.runtime/ci-raw/fixture.log 2>&1 || cleanup_status=1
+          fi
+          exit "$cleanup_status"
+
+      - name: Collect and redact evidence
+        if: always()
+        id: evidence
+        env:
+          TESTRIGOR_API_KEY: ${{ secrets.TESTRIGOR_CI_TOKEN }}
+          JOB_STATUS: ${{ job.status }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tests/E2E/ci-support.py collect
+          echo 'ready=true' >> "$GITHUB_OUTPUT"
+
+      - name: Upload sanitized evidence
+        if: always() && steps.evidence.outputs.ready == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: medusa-admin-e2e-${{ github.run_id }}-${{ github.run_attempt }}
+          path: tests/E2E/.run/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Remove ephemeral fixture
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash tests/E2E/ci-proxy.sh stop
+          if [[ -f tests/E2E/.runtime/environment.env && -f tests/E2E/.runtime/image.env ]]; then
+            docker compose --project-name medusa-testrigor-e2e \
+              --env-file tests/E2E/.runtime/environment.env \
+              --env-file tests/E2E/.runtime/image.env \
+              --file tests/E2E/compose.yaml down --volumes
+          fi

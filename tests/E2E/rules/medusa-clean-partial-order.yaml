@@ -1,0 +1,16 @@
+steps: |
+  save string with parameters "${e2eApiBase}/admin/reservations?inventory_item_id=${partialInventoryId}" as "apiUrl"
+  call api get stored value "apiUrl" with headers "Content-Type:application/json" and stored value "apiAuthorization" and get "$.reservations[0].id" and save it as "remainingReservationId" and then check that http code is 200
+  save string with parameters "${e2eApiBase}/admin/reservations/${remainingReservationId}" as "apiUrl"
+  call api delete stored value "apiUrl" with headers "Content-Type:application/json" and stored value "apiAuthorization" and then check that http code is 200
+  save string with parameters "${e2eApiBase}/admin/orders/${partialOrderId}" as "apiUrl"
+  save string with parameters "{\"metadata\":{\"e2e_owner\":\"medusa-admin-e2e-08-09\",\"e2e_case\":\"TC-09\",\"e2e_run\":\"${caseSuffix}\",\"e2e_retired\":true}}" as "requestBody"
+  call api post stored value "apiUrl" with headers "Content-Type:application/json" and stored value "apiAuthorization" and body stored value "requestBody" and then check that http code is 200
+  save string with parameters "${e2eApiBase}/admin/products/${partialProductId}" as "apiUrl"
+  call api delete stored value "apiUrl" with headers "Content-Type:application/json" and stored value "apiAuthorization" and then check that http code is 200
+  save string with parameters "${e2eApiBase}/admin/inventory-items/${partialInventoryId}" as "apiUrl"
+  call api delete stored value "apiUrl" with headers "Content-Type:application/json" and stored value "apiAuthorization" and then check that http code is 200
+  save string with parameters "${e2eApiBase}/admin/customers/${partialCustomerId}" as "apiUrl"
+  call api delete stored value "apiUrl" with headers "Content-Type:application/json" and stored value "apiAuthorization" and then check that http code is 200
+labels:
+- medusa-api-fixture

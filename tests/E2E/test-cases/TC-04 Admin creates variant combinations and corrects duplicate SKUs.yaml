@@ -1,0 +1,97 @@
+customSteps: |
+  medusa-admin-sign-in
+  click "Products"
+  click "Create"
+  generate from regex "e2etc04[a-z]{16}", then enter into "Title" and save as "productName"
+  click "Yes, this is a product with variants"
+  click dropdown below "Product options"
+  type "Size"
+  click "Create \"Size\""
+  click label "Product variants"
+  click "Red, Blue, Green"
+  type "Small"
+  type enter
+  type "Large"
+  type enter
+  click dropdown below "Product options"
+  type "Color"
+  click "Create \"Color\""
+  click label "Product variants"
+  click "Red, Blue, Green"
+  type "Red"
+  type enter
+  type "Blue"
+  type enter
+  click "Continue"
+  click "Continue"
+  check that page contains "Small / Red"
+  check that page contains "Small / Blue"
+  check that page contains "Large / Red"
+  check that page contains "Large / Blue"
+  double click table at row containing "Small / Red" and column "SKU"
+  type "e2e-small-red"
+  type tab
+  double click table at row containing "Small / Blue" and column "SKU"
+  type "e2e-small-red"
+  type tab
+  double click table at row containing "Large / Red" and column "SKU"
+  type "e2e-large-red"
+  type tab
+  double click table at row containing "Large / Blue" and column "SKU"
+  type "e2e-large-blue"
+  type tab
+  double click table at row containing "Small / Red" and column "Price EUR"
+  type "11"
+  type tab
+  double click table at row containing "Small / Blue" and column "Price EUR"
+  type "12"
+  type tab
+  double click table at row containing "Large / Red" and column "Price EUR"
+  type "21"
+  type tab
+  double click table at row containing "Large / Blue" and column "Price EUR"
+  type "22"
+  type tab
+  check that table at row containing "Small / Red" and column "SKU" has value "e2e-small-red" and stop test if fails
+  check that table at row containing "Small / Blue" and column "SKU" has value "e2e-small-red" and stop test if fails
+  click "Save as draft"
+  hover over "1" to the right of "Small / Blue"
+  check that page contains "SKU must be unique." and stop test if fails
+  double click table at row containing "Small / Blue" and column "SKU"
+  type ctrl a
+  type "e2e-small-blue"
+  type tab
+  click "Save as draft"
+  check that page doesn't contain "Save as draft"
+  reload
+  check that page contains stored value from "productName"
+  check that page contains "Small / Red"
+  check that page contains "Small / Blue"
+  check that page contains "Large / Red"
+  check that page contains "Large / Blue"
+  click "Small / Red"
+  check that page contains "e2e-small-red"
+  check that page contains "€11.00"
+  go back
+  click "Small / Blue"
+  check that page contains "e2e-small-blue"
+  check that page contains "€12.00"
+  go back
+  click "Large / Red"
+  check that page contains "e2e-large-red"
+  check that page contains "€21.00"
+  go back
+  click "Large / Blue"
+  check that page contains "e2e-large-blue"
+  check that page contains "€22.00"
+  go back
+  click button to the right of "Draft"
+  click "Delete"
+  click "Delete"
+  check that page doesn't contain stored value from "productName"
+  reload
+  check that page doesn't contain stored value from "productName"
+labels:
+  - medusa-admin-e2e
+  - medusa-admin-expansion
+  - medusa-admin-variants
