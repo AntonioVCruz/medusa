@@ -1,7 +1,7 @@
 customSteps: |
   medusa-admin-sign-in
   click "Orders"
-  click "Drafts"
+  click "Draft Orders"
   click stored value "e2eDraftCustomer"
   check that page contains stored value from "e2eDraftItem"
   check that page contains "€50.00"

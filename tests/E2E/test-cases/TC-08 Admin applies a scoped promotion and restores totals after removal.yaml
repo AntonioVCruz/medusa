@@ -27,7 +27,7 @@ customSteps: |
   reload
   check that page contains stored value from "eligibleTitle" and stop test if fails
   click "Orders"
-  click "Drafts"
+  click "Draft Orders"
   click stored value "promotionEmail"
   check that page contains "60.00 EUR" to the right of "Total" and stop test if fails
   click button to the right of "Summary"

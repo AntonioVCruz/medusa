@@ -3,6 +3,7 @@ customSteps: |
   click "Customers"
   click "Customer Groups"
   click stored value "e2eGroup"
+  check that page contains "This group doesn't have customers."
   click "Add"
   enter stored value "e2eCustomer" into "Search"
   click checkbox to the left of stored value "e2eCustomer"
