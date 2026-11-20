@@ -70,7 +70,6 @@ with tempfile.TemporaryDirectory() as temp:
     try:
         with patch.object(proxy, "UPSTREAM_PORT", upstream.server_port):
             server = ThreadingHTTPServer(("127.0.0.1", 0), proxy.Proxy)
-            server.scheme = "https"
             tls = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
             tls.load_cert_chain(cert, key)
             server.socket = tls.wrap_socket(server.socket, server_side=True)

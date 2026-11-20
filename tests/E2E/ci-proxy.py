@@ -51,17 +51,13 @@ class Proxy(BaseHTTPRequestHandler):
             }
             headers = {key: value for key, value in self.headers.items()
                        if key.lower() not in HOP_HEADERS | connection_headers | {"content-length"}}
-            headers["X-Forwarded-Proto"] = self.server.scheme
+            headers["X-Forwarded-Proto"] = "https"
             headers["X-Forwarded-Host"] = self.headers.get("Host", "localhost:18443")
             if body is not None:
                 headers["Content-Length"] = str(len(body))
             upstream.request(self.command, self.path, body=body, headers=headers)
             response = upstream.getresponse()
             content = response.read()
-            if self.path == "/auth/user/emailpass":
-                framing = "chunked" if self.headers.get("Transfer-Encoding", "").lower() == "chunked" else "content-length"
-                print(f"Auth proxy: framing={framing}, bytes={len(body or b'')}, "
-                      f"upstream_status={response.status}", flush=True)
             self.send_response(response.status)
             for key, value in response.getheaders():
                 if key.lower() not in HOP_HEADERS | {"content-length"}:
@@ -86,17 +82,14 @@ class Proxy(BaseHTTPRequestHandler):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--protocol", choices=["http", "https"], default="https")
-    parser.add_argument("--cert", type=Path)
-    parser.add_argument("--key", type=Path)
+    parser.add_argument("--cert", type=Path, required=True)
+    parser.add_argument("--key", type=Path, required=True)
     args = parser.parse_args()
     server = ThreadingHTTPServer(("127.0.0.1", 18443), Proxy)
-    server.scheme = args.protocol
-    if args.protocol == "https":
-        context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-        context.load_cert_chain(args.cert, args.key)
-        server.socket = context.wrap_socket(server.socket, server_side=True)
-    print(f"CI proxy: {args.protocol}://localhost:18443 -> http://127.0.0.1:19000", flush=True)
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    context.load_cert_chain(args.cert, args.key)
+    server.socket = context.wrap_socket(server.socket, server_side=True)
+    print("CI proxy: https://localhost:18443 -> http://127.0.0.1:19000", flush=True)
     try:
         server.serve_forever()
     finally:

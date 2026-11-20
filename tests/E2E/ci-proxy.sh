@@ -19,10 +19,10 @@ stop() {
   fi
 }
 
-case "${1:-https}" in
+case "${1:-start}" in
   stop) stop; exit ;;
-  https|http) protocol=$1 ;;
-  *) echo 'Usage: ci-proxy.sh {https|http|stop}' >&2; exit 2 ;;
+  start) ;;
+  *) echo 'Usage: ci-proxy.sh {start|stop}' >&2; exit 2 ;;
 esac
 stop
 mkdir -p "$tls" "$state/ci-raw"
@@ -35,13 +35,13 @@ if [[ ! -f "$tls/cert.pem" ]]; then
 fi
 openssl x509 -in "$tls/cert.pem" -noout -subject -ext subjectAltName \
   > "$state/ci-raw/tls-certificate.txt"
-python3 tests/E2E/ci-proxy.py --protocol "$protocol" \
+python3 tests/E2E/ci-proxy.py \
   --cert "$tls/cert.pem" --key "$tls/key.pem" \
-  > "$state/ci-raw/proxy-$protocol.log" 2>&1 &
+  > "$state/ci-raw/proxy.log" 2>&1 &
 echo "$!" > "$pidfile"
 for ((attempt=0; attempt<30; attempt++)); do
   if curl --noproxy '*' --cacert "$tls/cert.pem" --connect-timeout 2 --max-time 5 \
-    --fail --silent "$protocol://localhost:18443/health" > /dev/null; then
+    --fail --silent "https://localhost:18443/health" > /dev/null; then
     exit
   fi
   sleep 1

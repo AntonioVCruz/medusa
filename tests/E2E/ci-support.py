@@ -69,8 +69,7 @@ def admin_probe():
     if not re.fullmatch(r"127\.0\.0\.1:[0-9]+", published):
         raise ValueError("Expected one IPv4 loopback-only app port mapping")
     url = os.environ.get("MEDUSA_E2E_URL", "http://" + published + "/app")
-    if url not in {"http://" + published + "/app", "http://localhost:19000/app",
-                   "https://localhost:18443/app", "http://localhost:18443/app"}:
+    if url not in {"http://" + published + "/app", "https://localhost:18443/app"}:
         raise ValueError("Expected a supported loopback Admin URL")
     record("Admin URL: " + url)
     record("Proxy bypass: --noproxy '*'; no redirects followed; connect timeout 5s, total timeout 20s")
@@ -185,7 +184,7 @@ def collect():
         "job_status": os.environ.get("JOB_STATUS"),
         "cli_version": version.group(1) if version else None,
         "admin_url": os.environ.get("MEDUSA_E2E_URL"),
-        "transport": "testRigor localhost tunnel (requires separate verification)",
+        "transport": "testRigor localhost tunnel over HTTPS",
         "sha256": {p.relative_to(ROOT).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
                    for p in files},
     }

@@ -92,10 +92,6 @@ async function main() {
     const draft = (await api(`/admin/draft-orders/${state.draft_id}?fields=+total,+tax_total,+shipping_total,+items.*`)).draft_order
     if (Number(draft.total) !== 50 || Number(draft.tax_total) !== 0 || Number(draft.shipping_total) !== 0) throw new Error("Draft seed is not the expected EUR 50 baseline")
     console.log(JSON.stringify({ state: "prepared", variables: names, region_id: state.region_id, location_id: state.location_id }))
-  } else if (action === "inspect") {
-    const draft = (await api(`/admin/draft-orders/${state.draft_id}?fields=+total,+tax_total,+shipping_total,+items.*`)).draft_order
-    const item = (await api(`/admin/inventory-items/${state.inventory_id}`)).inventory_item
-    console.log(JSON.stringify({ variables: names, region_id: state.region_id, location_id: state.location_id, draft: { total: draft.total, tax_total: draft.tax_total, shipping_total: draft.shipping_total, items: draft.items?.map((line) => ({ title: line.title, quantity: line.quantity, unit_price: line.unit_price })) }, inventory: item.location_levels }))
   } else if (action === "check") {
     const products = (await api("/admin/products?limit=100")).products
     const remaining = products.filter((entry) => !state.baseline_products.includes(entry.id))
@@ -124,7 +120,7 @@ async function main() {
       checkpoint()
     }
     console.log(JSON.stringify({ state: "cleaned", retained_infrastructure: [state.region_id, state.location_id] }))
-  } else throw new Error("Expected prepare, inspect, check or cleanup")
+  } else throw new Error("Expected prepare, check or cleanup")
 }
 main().catch((error) => {
   console.error(error.message)
